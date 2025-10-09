@@ -1,5 +1,7 @@
+import { Query } from "pg";
 import { handleSuccess, handleErrorClient, handleErrorServer} from "../Handlers/responseHandlers.js";
 import { updateUser, deleteUser } from "../services/user.service.js";
+import { profileQueryValidation } from "../validations/user.validations.js";
 
 
 export function getPublicProfile(req, res) {
@@ -20,6 +22,7 @@ export function getPrivateProfile(req, res) {
 export async function updatePrivateProfile(req, res) {
   const userId = req.user.id;
   const { email, password } = req.body;
+
 
   try {
     const updates = {};
@@ -49,27 +52,32 @@ export async function updatePrivateProfile(req, res) {
 
     return handleSuccess(res, 200, "Perfil modificado con éxito", { user: userData });
 
-  } catch (err) {
-    if (err.message === "Usuario no encontrado") {
+  } catch (error) {
+    if (error.message === "Usuario no encontrado") {
       return handleErrorClient(res, 404, "No se encontró el usuario");
     }
-    if (err.message.includes("email")) {
+    if (error.message.includes("email")) {
       return handleErrorClient(res, 409, "El correo ya pertenece a otro usuario");
     }
-    return handleErrorServer(res, 500, "Error al actualizar perfil", err.message);
+    return handleErrorServer(res, 500, "Error al actualizar perfil", error.message);
   }
 }
 
 export async function deletePrivateProfile(req, res) {
-  const userId = req.user.id;
+  const { query } = req;
 
   try {
+    const { error } = profileQueryValidation.validate(query);
+    if(error) {
+      return handleErrorClient(res, 400, "Parametros de consulta invalidos", error.message);
+    }
+    const userId = query.id;
     await deleteUser(userId);
     return handleSuccess(res, 200, "Cuenta eliminada correctamente", { message: "Su cuenta ha sido borrada de forma permanente" });
-  } catch (err) {
-    if (err.message === "Usuario no encontrado") {
+  } catch (error) {
+    if (error.message === "Usuario no encontrado") {
       return handleErrorClient(res, 404, "Usuario no encontrado");
     }
-    return handleErrorServer(res, 500, "Error al eliminar cuenta", err.message);
+    return handleErrorServer(res, 500, "Error al eliminar cuenta", error.message);
   }
 }
